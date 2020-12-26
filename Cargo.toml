@@ -1,0 +1,12 @@
+[package]
+name = "rust_hashmap_gem"
+version = "0.1.0"
+authors = ["irxground <irxnjhtchlnrw@gmail.com>"]
+edition = "2018"
+description = "a Ruby native extension using Rust with minimal dependencies"
+homepage = "https://github.com/irxground/rust_hashmap_gem"
+repository = "https://github.com/irxground/rust_hashmap_gem"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
