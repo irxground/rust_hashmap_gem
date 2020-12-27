@@ -33,26 +33,41 @@ class BuildTask < Rake::TaskLib
       rm_f target_so
     end
 
-    desc "Compile native extension"
+    desc "Compile native extension (optimized)"
     task :build => :cargo do
-      env = { "RUSTFLAGS" => "-C target-cpu=native" }
-      if RUBY_PLATFORM =~ /mingw/
-        env["RUSTUP_TOOLCHAIN"] = "stable-#{RbConfig::CONFIG["host_cpu"]}-pc-windows-gnu"
-      end
-      cmds = ["cargo", "build", "--release", "--manifest-path", manifest_file]
-      cmds.concat ["--features", "method_cache"] if ENV["METHOD_CACHE"]
-      sh env, *cmds
+      build("release")
+    end
+
+    desc "Compile native extension (NOT optimized)"
+    task :build_debug => :cargo do
+      build("debug")
     end
 
     directory target_so_dir
 
-    desc "Place compiled library"
+    desc "Place native library (optimized)"
     task :install => [:build, target_so_dir] do
-      cp cargo_output, target_so, preserve: true, verbose: true
+      cp cargo_output("release"), target_so, preserve: true, verbose: true
+    end
+
+    desc "Place native library (NOT optimized)"
+    task :install_debug => [:build_debug, target_so_dir] do
+      cp cargo_output("debug"), target_so, preserve: true, verbose: true
     end
   end
 
-  def cargo_output
+  def build(profile)
+    env = { "RUSTFLAGS" => "-C target-cpu=native" }
+    if RUBY_PLATFORM =~ /mingw/
+      env["RUSTUP_TOOLCHAIN"] = "stable-#{RbConfig::CONFIG["host_cpu"]}-pc-windows-gnu"
+    end
+    cmds = ["cargo", "build", "--manifest-path", manifest_file]
+    cmds.concat ["--release"] if profile == "release"
+    cmds.concat ["--features", "method_cache"] if ENV["METHOD_CACHE"]
+    sh env, *cmds
+  end
+
+  def cargo_output(profile)
     metadata = JSON.parse(`cargo metadata --format-version=1 --manifest-path #{manifest_file}`)
     cargo_name = metadata.dig("packages", 0, "name")
     filename = case RUBY_PLATFORM
@@ -60,6 +75,6 @@ class BuildTask < Rake::TaskLib
       when /darwin/; "lib#{cargo_name}.dylib"
       when /linux/; "lib#{cargo_name}.so"
       end
-    File.join(metadata["target_directory"], "release", filename)
+    File.join(metadata["target_directory"], profile, filename)
   end
 end

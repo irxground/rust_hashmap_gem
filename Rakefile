@@ -9,4 +9,4 @@ task :fmt do
   system "rufo ."
 end
 
-task :default => [:clobber, :install, :spec]
+task :default => [:clobber, :install_debug, :spec]
