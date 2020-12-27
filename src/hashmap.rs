@@ -2,8 +2,8 @@ use crate::hashable::Hashable;
 use crate::ruby::*;
 use std::collections::HashMap;
 use std::ffi;
-use std::ptr;
 use std::mem;
+use std::ptr;
 
 type Map = HashMap<Hashable, Value>;
 
@@ -13,6 +13,9 @@ pub fn define_ruby_class(name: &ffi::CStr, module: Option<Value>) -> Value {
         Some(m) => define_class_under(m, name, super_),
         None => define_class(name, super_),
     };
+    let sym_hash = module_eval(klass, "def self.value_hash(val); val.hash; end");
+    let sym_eq = module_eval(klass, "def self.values_eql?(a, b); a.eql?(b); end");
+    init_method_cache(klass, sym_hash, sym_eq);
     define_alloc_func(klass, alloc);
     define_method::<F1>(klass, "size", size);
     define_method::<F2>(klass, "[]", get);
@@ -37,6 +40,34 @@ static RUBY_TYPE: DataType = DataType {
     flags: DataTypeFlag::FreeImmediately,
 };
 
+#[cfg(feature = "method_cache")]
+pub static mut M_HASH: Value = NIL;
+
+#[cfg(feature = "method_cache")]
+pub static mut M_EQ: Value = NIL;
+
+#[cfg(feature = "method_cache")]
+#[inline]
+fn mark_method_cache() {
+    gc_mark(unsafe { M_EQ });
+    gc_mark(unsafe { M_HASH });
+}
+#[cfg(not(feature = "method_cache"))]
+#[inline]
+fn mark_method_cache() {}
+
+#[cfg(feature = "method_cache")]
+#[inline]
+fn init_method_cache(klass: Value, sym_hash: Value, sym_eq: Value) {
+    unsafe {
+        M_HASH = obj_method_by_symbol(klass, sym_hash);
+        M_EQ = obj_method_by_symbol(klass, sym_eq);
+    }
+}
+#[cfg(not(feature = "method_cache"))]
+#[inline]
+fn init_method_cache(_klass: Value, _sym_hash: Value, _sym_eq: Value) {}
+
 extern "C" fn mark(ptr: *const ffi::c_void) {
     let ptr = ptr as *const Map;
     let map = unsafe { &*ptr };
@@ -44,6 +75,7 @@ extern "C" fn mark(ptr: *const ffi::c_void) {
         gc_mark(key.0);
         gc_mark(val);
     }
+    mark_method_cache();
 }
 
 extern "C" fn free(ptr: *mut ffi::c_void) {
@@ -55,9 +87,9 @@ extern "C" fn object_size(ptr: *const ffi::c_void) -> usize {
     mem::size_of_val(unsafe { &*ptr })
 }
 
-extern "C" fn alloc(self_: Value) -> Value {
+extern "C" fn alloc(klass: Value) -> Value {
     let value = Box::new(HashMap::new());
-    data_typed_object_wrap::<Map>(self_, value, &RUBY_TYPE)
+    data_typed_object_wrap::<Map>(klass, value, &RUBY_TYPE)
 }
 
 extern "C" fn size(self_: Value) -> Value {

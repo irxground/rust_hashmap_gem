@@ -35,11 +35,13 @@ class BuildTask < Rake::TaskLib
 
     desc "Compile native extension"
     task :build => :cargo do
-      env = {"RUSTFLAGS" => "-C target-cpu=native"}
+      env = { "RUSTFLAGS" => "-C target-cpu=native" }
       if RUBY_PLATFORM =~ /mingw/
         env["RUSTUP_TOOLCHAIN"] = "stable-#{RbConfig::CONFIG["host_cpu"]}-pc-windows-gnu"
       end
-      sh env, "cargo", "build", "--release", "--manifest-path", manifest_file
+      cmds = ["cargo", "build", "--release", "--manifest-path", manifest_file]
+      cmds.concat ["--features", "method_cache"] if ENV["METHOD_CACHE"]
+      sh env, *cmds
     end
 
     directory target_so_dir

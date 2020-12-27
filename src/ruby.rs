@@ -4,20 +4,18 @@ use std::ptr;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 #[repr(transparent)]
-pub struct Value(usize);
+pub struct Value(isize);
 
 impl Value {
     #[inline]
-    pub fn to_raw(self) -> usize {
+    pub fn to_raw(self) -> isize {
         self.0
     }
 }
 
 impl fmt::Debug for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Point")
-            .field("object_id", &object_id(*self))
-            .finish()
+        f.debug_tuple("RbValue").field(&object_id(*self)).finish()
     }
 }
 
@@ -87,16 +85,16 @@ impl RubyFunc for F4 {
 
 #[cfg(target_pointer_width = "32")]
 mod consts {
-    pub const FALSE: usize = 0;
-    pub const TRUE: usize = 2;
-    pub const NIL: usize = 4;
+    pub const FALSE: isize = 0;
+    pub const TRUE: isize = 2;
+    pub const NIL: isize = 4;
 }
 
 #[cfg(target_pointer_width = "64")]
 mod consts {
-    pub const FALSE: usize = 0;
-    pub const TRUE: usize = 0x14;
-    pub const NIL: usize = 0x08;
+    pub const FALSE: isize = 0;
+    pub const TRUE: isize = 0x14;
+    pub const NIL: isize = 0x08;
 }
 
 pub const FALSE: Value = Value(consts::FALSE);
@@ -144,6 +142,9 @@ extern "C" {
     // ID rb_intern2(const char *name, long len)
     fn rb_intern2(name: *const u8, len: usize) -> Id;
 
+    // VALUE rb_id2sym(ID x)
+    fn rb_id2sym(x: Id) -> Value;
+
     // void rb_define_method_id(VALUE klass, ID mid, VALUE (*func)(ANYARGS), int argc)
     fn rb_define_method_id(klass: Value, mid: Id, func: *const ffi::c_void, argc: i32);
 
@@ -161,6 +162,18 @@ extern "C" {
 
     // VALUE *rb_ary_ptr_use_start(VALUE ary)
     fn rb_ary_ptr_use_start(ary: Value) -> *mut Value;
+
+    // VALUE rb_obj_method(VALUE obj, VALUE vid)
+    fn rb_obj_method(obj: Value, vid: Value) -> Value;
+
+    // VALUE rb_method_call(int argc, const VALUE *argv, VALUE method)
+    fn rb_method_call(argc: i32, argv: *const Value, method: Value) -> Value;
+
+    // long rb_num2long(VALUE val)
+    fn rb_num2long(val: Value) -> isize;
+
+    // VALUE rb_mod_module_eval(int argc, const VALUE *argv, VALUE mod)
+    fn rb_mod_module_eval(argc: i32, argv: *const Value, module: Value) -> Value;
 }
 
 #[inline]
@@ -169,8 +182,8 @@ pub fn gc_mark(obj: Value) {
 }
 
 #[inline]
-pub fn object_id(obj: Value) -> usize {
-    unsafe { rb_obj_id(obj) }.0 >> 1
+pub fn object_id(obj: Value) -> isize {
+    value_to_int(unsafe { rb_obj_id(obj) })
 }
 
 #[inline]
@@ -234,7 +247,17 @@ pub fn fun_call(self_: Value, method: &str, args: &[Value]) -> Value {
 
 #[inline]
 pub fn int_to_value(value: isize) -> Value {
-    Value(((value as usize) << 1) + 1)
+    Value((value << 1) + 1)
+}
+
+#[inline]
+pub fn value_to_int(value: Value) -> isize {
+    if (value.to_raw() as usize) % 2 == 1 {
+        // fast path
+        (value.to_raw() as isize) >> 1
+    } else {
+        unsafe { rb_num2long(value) }
+    }
 }
 
 #[inline]
@@ -252,6 +275,31 @@ pub fn ary_store(ary: Value, idx: isize, item: Value) {
     unsafe { rb_ary_store(ary, idx, item) }
 }
 
+#[inline]
 pub fn ary_ptr_use_start(ary: Value) -> *mut Value {
     unsafe { rb_ary_ptr_use_start(ary) }
+}
+
+#[inline]
+pub fn obj_method(obj: Value, name: &str) -> Value {
+    unsafe {
+        let id = rb_intern2(name.as_ptr(), name.len());
+        rb_obj_method(obj, rb_id2sym(id))
+    }
+}
+
+#[inline]
+pub fn obj_method_by_symbol(obj: Value, name: Value) -> Value {
+    unsafe { rb_obj_method(obj, name) }
+}
+
+#[inline]
+pub fn method_call(method: Value, args: &[Value]) -> Value {
+    unsafe { rb_method_call(args.len() as i32, args.as_ptr(), method) }
+}
+
+pub fn module_eval(module: Value, code: &str) -> Value {
+    let s = new_string(code);
+    let args = [s];
+    unsafe { rb_mod_module_eval(args.len() as i32, args.as_ptr(), module) }
 }

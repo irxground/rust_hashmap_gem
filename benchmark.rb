@@ -1,20 +1,21 @@
 # https://gist.github.com/wrzasa/6b456f73012ce98ae6feb6aaa4ba933e
 
-require 'benchmark'
-require 'optparse'
+require "benchmark"
+require "optparse"
 require "bundler/setup"
 require "rust_hashmap"
 
 use_rust = false
 seed = nil
 opt = OptionParser.new
-opt.on('-r', '--[no-]rust') {|v| use_rust = true }
-opt.on('-s', '--seed VALUE') {|v| seed = v.to_i }
+opt.on("-r", "--[no-]rust") { |v| use_rust = true }
+opt.on("-s", "--seed VALUE") { |v| seed = v.to_i }
 opt.parse!(ARGV)
 
 puts "Hash: #{use_rust ? "Rust" : "Original"}"
 if seed
   puts "Seed: #{seed}"
+  srand(seed)
 end
 
 h = use_rust ? Rust::HashMap.new : {}
