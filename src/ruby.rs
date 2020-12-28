@@ -103,19 +103,19 @@ pub const NIL: Value = Value(consts::NIL);
 
 #[cfg(target_pointer_width = "32")]
 mod mask {
-    pub const IMMEDIATE_MASK :usize = 0x07;
-    pub const FIXNUM_FLAG    :usize = 0x01;
-    pub const FLONUM_MASK    :usize = 0x03;
-    pub const FLONUM_FLAG    :usize = 0x02;
-    pub const SYMBOL_FLAG    :usize = 0x0c;
+    pub const IMMEDIATE_MASK: usize = 0x07;
+    pub const FIXNUM_FLAG: usize = 0x01;
+    pub const FLONUM_MASK: usize = 0x03;
+    pub const FLONUM_FLAG: usize = 0x02;
+    pub const SYMBOL_FLAG: usize = 0x0c;
 }
 #[cfg(target_pointer_width = "64")]
 mod mask {
-    pub const IMMEDIATE_MASK : usize = 0x03;
-    pub const FIXNUM_FLAG    : usize = 0x01;
-    pub const FLONUM_MASK    : usize = 0x00;
-    pub const FLONUM_FLAG    : usize = 0x02;
-    pub const SYMBOL_FLAG    : usize = 0x0e;
+    pub const IMMEDIATE_MASK: usize = 0x03;
+    pub const FIXNUM_FLAG: usize = 0x01;
+    pub const FLONUM_MASK: usize = 0x00;
+    pub const FLONUM_FLAG: usize = 0x02;
+    pub const SYMBOL_FLAG: usize = 0x0e;
 }
 pub use mask::*;
 

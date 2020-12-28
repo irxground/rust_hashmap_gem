@@ -1,4 +1,5 @@
 mod hashable;
+mod hasher;
 mod hashmap;
 pub mod ruby; // To ignore unused function
 

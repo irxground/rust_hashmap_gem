@@ -13,3 +13,5 @@ crate-type = ["cdylib"]
 
 [features]
 method_cache = []
+
+[dependencies]

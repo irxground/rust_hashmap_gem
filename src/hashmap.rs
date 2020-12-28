@@ -5,7 +5,7 @@ use std::ffi;
 use std::mem;
 use std::ptr;
 
-type Map = HashMap<Hashable, Value>;
+type Map = HashMap<Hashable, Value, crate::hasher::HashBuilder>;
 
 pub fn define_ruby_class(name: &ffi::CStr, module: Option<Value>) -> Value {
     let super_: Value = unsafe { rb_cData };
@@ -68,7 +68,7 @@ extern "C" fn object_size(ptr: *const ffi::c_void) -> usize {
 }
 
 extern "C" fn alloc(klass: Value) -> Value {
-    let value = Box::new(HashMap::new());
+    let value = Box::new(HashMap::default());
     data_typed_object_wrap::<Map>(klass, value, &RUBY_TYPE)
 }
 
