@@ -58,4 +58,32 @@ RSpec.describe Rust::HashMap do
       expect(hash.values.sort).to eq([2, 3].sort)
     end
   end
+
+  it "should support various types" do
+    testcases = [
+      [true, false],
+      [1, 2, 3, 4, 5],
+      [:foo, :bar, :baz],
+      ["foo", "bar", "baz"],
+      [Object.new, Object.new, Object.new],
+      [[], [2, 3], {}, {foo: 1}, "bar", :baz, 1, true, Object.new],
+    ]
+    testcases.each do |testcase|
+      hash = Rust::HashMap.new
+      testcase.each_with_index do |key, index|
+        hash[key] = index
+        expect(hash[key]).to eq(index)
+        expect(hash.size).to eq(index + 1)
+        hash[key] = index + 1
+        expect(hash[key]).to eq(index + 1)
+        expect(hash.size).to eq(index + 1)
+      end
+      testcase.each_with_index do |key, index|
+        expect(hash.delete(key)).to eq(index + 1)
+        expect(hash.size).to eq(testcase.size - index - 1)
+        expect(hash.delete(key)).to eq(nil)
+        expect(hash.size).to eq(testcase.size - index - 1)
+      end
+    end
+  end
 end
