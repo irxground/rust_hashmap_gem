@@ -62,9 +62,10 @@ RSpec.describe Rust::HashMap do
   it "should support various types" do
     testcases = [
       [true, false],
-      [1, 2, 3, 4, 5],
+      [0, 1, -1, 2 ** 60, 2 ** 65, -(2 ** 60), -(2 ** 65)],
+      [0.0, 0.5, Math::PI, Math::E],
       [:foo, :bar, :baz],
-      ["foo", "bar", "baz"],
+      ["", "foo", "bar", "baz"],
       [Object.new, Object.new, Object.new],
       [[], [2, 3], {}, {foo: 1}, "bar", :baz, 1, true, Object.new],
     ]
