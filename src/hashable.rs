@@ -2,36 +2,35 @@ use crate::ruby;
 use std::hash::{Hash, Hasher};
 
 #[derive(Copy, Clone)]
-#[repr(transparent)]
-pub struct Hashable(pub ruby::Value);
+pub struct Hashable(pub ruby::Value, pub isize);
 
 impl PartialEq for Hashable {
-    #[cfg(feature = "method_cache")]
     fn eq(&self, other: &Self) -> bool {
-        let method = unsafe { crate::hashmap::M_EQ };
-        let val = ruby::method_call(method, &[self.0, other.0]);
-        val == ruby::TRUE
-    }
-
-    #[cfg(not(feature = "method_cache"))]
-    fn eq(&self, other: &Self) -> bool {
-        let val = ruby::fun_call(self.0, "eql?", &[other.0]);
-        val == ruby::TRUE
+        let raw = self.0.to_raw() as usize;
+        if raw & ruby::IMMEDIATE_MASK == 0 || raw & ruby::FLONUM_MASK == ruby::FLONUM_FLAG {
+            eq(self.0, other.0) == ruby::TRUE
+        } else {
+            self.0 == other.0
+        }
     }
 }
 impl Eq for Hashable {}
 
-impl Hash for Hashable {
-    #[cfg(feature = "method_cache")]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        let method = unsafe { crate::hashmap::M_HASH };
-        let val = ruby::method_call(method, &[self.0]);
-        ruby::value_to_int(val).hash(state);
-    }
+#[cfg(feature = "method_cache")]
+#[inline]
+fn eq(left: ruby::Value, right: ruby::Value) -> ruby::Value {
+    let method = unsafe { crate::hashmap::M_EQ };
+    ruby::method_call(method, &[left, right])
+}
 
-    #[cfg(not(feature = "method_cache"))]
+#[cfg(not(feature = "method_cache"))]
+#[inline]
+fn eq(left: ruby::Value, right: ruby::Value) -> ruby::Value {
+    ruby::fun_call(left, "eql?", &[right])
+}
+
+impl Hash for Hashable {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        let val = ruby::fun_call(self.0, "hash", &[]);
-        ruby::value_to_int(val).hash(state);
+        self.1.hash(state);
     }
 }

@@ -67,7 +67,7 @@ RSpec.describe Rust::HashMap do
       [:foo, :bar, :baz],
       ["", "foo", "bar", "baz"],
       [Object.new, Object.new, Object.new],
-      [[], [2, 3], {}, {foo: 1}, "bar", :baz, 1, true, Object.new],
+      [[], [2, 3], {}, { foo: 1 }, "bar", :baz, 1, true, Object.new],
     ]
     testcases.each do |testcase|
       hash = Rust::HashMap.new

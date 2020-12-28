@@ -101,6 +101,24 @@ pub const FALSE: Value = Value(consts::FALSE);
 pub const TRUE: Value = Value(consts::TRUE);
 pub const NIL: Value = Value(consts::NIL);
 
+#[cfg(target_pointer_width = "32")]
+mod mask {
+    pub const IMMEDIATE_MASK :usize = 0x07;
+    pub const FIXNUM_FLAG    :usize = 0x01;
+    pub const FLONUM_MASK    :usize = 0x03;
+    pub const FLONUM_FLAG    :usize = 0x02;
+    pub const SYMBOL_FLAG    :usize = 0x0c;
+}
+#[cfg(target_pointer_width = "64")]
+mod mask {
+    pub const IMMEDIATE_MASK : usize = 0x03;
+    pub const FIXNUM_FLAG    : usize = 0x01;
+    pub const FLONUM_MASK    : usize = 0x00;
+    pub const FLONUM_FLAG    : usize = 0x02;
+    pub const SYMBOL_FLAG    : usize = 0x0e;
+}
+pub use mask::*;
+
 extern "C" {
     #[no_mangle]
     pub static rb_cData: Value;
@@ -252,9 +270,9 @@ pub fn int_to_value(value: isize) -> Value {
 
 #[inline]
 pub fn value_to_int(value: Value) -> isize {
-    if (value.to_raw() as usize) % 2 == 1 {
+    if (value.to_raw() as usize) & 1 == 1 {
         // fast path
-        (value.to_raw() as isize) >> 1
+        value.to_raw() >> 1
     } else {
         unsafe { rb_num2long(value) }
     }

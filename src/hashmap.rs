@@ -13,14 +13,16 @@ pub fn define_ruby_class(name: &ffi::CStr, module: Option<Value>) -> Value {
         Some(m) => define_class_under(m, name, super_),
         None => define_class(name, super_),
     };
-    let sym_hash = module_eval(klass, "def self.value_hash(val); val.hash; end");
-    let sym_eq = module_eval(klass, "def self.values_eql?(a, b); a.eql?(b); end");
-    init_method_cache(klass, sym_hash, sym_eq);
+    #[cfg(feature = "method_cache")]
+    unsafe {
+        let sym_eq = module_eval(klass, "def self.values_eql?(a, b); a.eql?(b); end");
+        M_EQ = obj_method_by_symbol(klass, sym_eq);
+    }
     define_alloc_func(klass, alloc);
     define_method::<F1>(klass, "size", size);
-    define_method::<F2>(klass, "[]", get);
-    define_method::<F3>(klass, "[]=", set);
-    define_method::<F2>(klass, "delete", delete);
+    define_method::<F3>(klass, "get_with_hash", get_with_hash);
+    define_method::<F4>(klass, "insert_with_hash", insert_with_hash);
+    define_method::<F3>(klass, "remove_with_hash", remove_with_hash);
     define_method::<F1>(klass, "keys", keys);
     define_method::<F1>(klass, "values", values);
     return klass;
@@ -41,32 +43,7 @@ static RUBY_TYPE: DataType = DataType {
 };
 
 #[cfg(feature = "method_cache")]
-pub static mut M_HASH: Value = NIL;
-
-#[cfg(feature = "method_cache")]
 pub static mut M_EQ: Value = NIL;
-
-#[cfg(feature = "method_cache")]
-#[inline]
-fn mark_method_cache() {
-    gc_mark(unsafe { M_EQ });
-    gc_mark(unsafe { M_HASH });
-}
-#[cfg(not(feature = "method_cache"))]
-#[inline]
-fn mark_method_cache() {}
-
-#[cfg(feature = "method_cache")]
-#[inline]
-fn init_method_cache(klass: Value, sym_hash: Value, sym_eq: Value) {
-    unsafe {
-        M_HASH = obj_method_by_symbol(klass, sym_hash);
-        M_EQ = obj_method_by_symbol(klass, sym_eq);
-    }
-}
-#[cfg(not(feature = "method_cache"))]
-#[inline]
-fn init_method_cache(_klass: Value, _sym_hash: Value, _sym_eq: Value) {}
 
 extern "C" fn mark(ptr: *const ffi::c_void) {
     let ptr = ptr as *const Map;
@@ -75,7 +52,10 @@ extern "C" fn mark(ptr: *const ffi::c_void) {
         gc_mark(key.0);
         gc_mark(val);
     }
-    mark_method_cache();
+    #[cfg(feature = "method_cache")]
+    unsafe {
+        gc_mark(M_EQ);
+    }
 }
 
 extern "C" fn free(ptr: *mut ffi::c_void) {
@@ -97,23 +77,23 @@ extern "C" fn size(self_: Value) -> Value {
     int_to_value(map.len() as isize)
 }
 
-extern "C" fn get(self_: Value, key: Value) -> Value {
+extern "C" fn get_with_hash(self_: Value, key: Value, hash: Value) -> Value {
     let map: &Map = unsafe { &*check_typeddata(self_, &RUBY_TYPE) };
-    match map.get(&Hashable(key)) {
+    match map.get(&Hashable(key, value_to_int(hash))) {
         Some(val) => *val,
         None => NIL,
     }
 }
 
-extern "C" fn set(self_: Value, key: Value, value: Value) -> Value {
+extern "C" fn insert_with_hash(self_: Value, key: Value, hash: Value, value: Value) -> Value {
     let map: &mut Map = unsafe { &mut *check_typeddata(self_, &RUBY_TYPE) };
-    map.insert(Hashable(key), value);
+    map.insert(Hashable(key, value_to_int(hash)), value);
     return value;
 }
 
-extern "C" fn delete(self_: Value, key: Value) -> Value {
+extern "C" fn remove_with_hash(self_: Value, key: Value, hash: Value) -> Value {
     let map: &mut Map = unsafe { &mut *check_typeddata(self_, &RUBY_TYPE) };
-    match map.remove(&Hashable(key)) {
+    match map.remove(&Hashable(key, value_to_int(hash))) {
         Some(val) => val,
         None => NIL,
     }
